@@ -1,17 +1,19 @@
 import { useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import Artplayer from 'artplayer';
 import Hls from 'hls.js';
-import type { Artplayer as ArtplayerType } from 'artplayer';
 
-function SimplePlayerPage() {
+function PlayerPage() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const artRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<ArtplayerType | null>(null);
+  const playerRef = useRef<any>(null);           // 使用 any 避免 Artplayer 类型导入问题
   const hlsRef = useRef<Hls | null>(null);
-  const url = searchParams.get('url');
 
-  // 清理播放器实例（防止内存泄漏）
+  const url = searchParams.get('url');
+  const title = searchParams.get('title') || '视频播放';
+
+  // 清理播放器实例，防止内存泄漏
   const cleanupPlayer = () => {
     if (hlsRef.current) {
       try {
@@ -34,7 +36,9 @@ function SimplePlayerPage() {
   };
 
   useEffect(() => {
-    if (!url || !artRef.current) return;
+    if (!url || !artRef.current) {
+      return;
+    }
 
     // 先清理旧实例
     cleanupPlayer();
@@ -42,6 +46,7 @@ function SimplePlayerPage() {
     const art = new Artplayer({
       container: artRef.current,
       url: url,
+      title: title,
       setting: true,
       autoplay: true,
       pip: true,
@@ -54,9 +59,9 @@ function SimplePlayerPage() {
       fastForward: true,
       theme: '#23ade5',
       customType: {
-        m3u8: function playM3u8(video: HTMLVideoElement, url: string, art: ArtplayerType) {
+        m3u8: function playM3u8(video: HTMLVideoElement, url: string, art: any) {
           if (Hls.isSupported()) {
-            // 清理旧的 hls 实例
+            // 清理旧 hls 实例
             if (hlsRef.current) {
               try {
                 hlsRef.current.destroy();
@@ -74,10 +79,9 @@ function SimplePlayerPage() {
             hls.attachMedia(video);
 
             hlsRef.current = hls;
-            // @ts-ignore （Artplayer 允许动态添加属性）
-            art.hls = hls;
+            (art as any).hls = hls;
 
-            // 监听 Artplayer 销毁事件，同步清理 hls
+            // 监听销毁事件同步清理 hls
             art.on('destroy', () => {
               if (hlsRef.current) {
                 try {
@@ -101,13 +105,13 @@ function SimplePlayerPage() {
 
     playerRef.current = art;
 
-    // 组件卸载或 url 变化时清理
+    // url 变化或组件卸载时清理
     return () => {
       cleanupPlayer();
     };
-  }, [url]);
+  }, [url, title]);
 
-  // 额外保险清理（组件完全卸载时）
+  // 额外保险清理
   useEffect(() => {
     return () => {
       cleanupPlayer();
@@ -119,11 +123,10 @@ function SimplePlayerPage() {
   }
 
   return (
-    <div
-      ref={artRef}
-      style={{ width: '100%', height: '100vh', backgroundColor: '#000' }}
-    />
+    <div style={{ width: '100%', height: '100vh', backgroundColor: '#000' }}>
+      <div ref={artRef} style={{ width: '100%', height: '100%' }} />
+    </div>
   );
 }
 
-export default SimplePlayerPage;
+export default PlayerPage;
